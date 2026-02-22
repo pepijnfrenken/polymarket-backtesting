@@ -23,15 +23,41 @@ def main() -> None:
 @click.option("--closed/--no-closed", default=None, help="Filter by closed status")
 @click.option("--limit", default=20, show_default=True, help="Max markets to return")
 @click.option("--format", "fmt", type=click.Choice(["json", "table"]), default="table")
-def markets(active: bool | None, closed: bool | None, limit: int, fmt: str) -> None:
+@click.option("--sort", default=None, help="Field to sort by (e.g., createdAt, startDate, volume)")
+@click.option("--ascending/--descending", "ascending", default=None, help="Sort direction")
+@click.option(
+    "--newer-than", default=None, help="Filter markets created after this date (YYYY-MM-DD)"
+)
+@click.option(
+    "--older-than", default=None, help="Filter markets created before this date (YYYY-MM-DD)"
+)
+def markets(
+    active: bool | None,
+    closed: bool | None,
+    limit: int,
+    fmt: str,
+    ascending: bool | None,
+    newer_than: str | None,
+    older_than: str | None,
+    sort: str | None,
+) -> None:
     with PolymarketData() as client:
-        results = client.get_markets(active=active, closed=closed, limit=limit)
+        results = client.get_markets(
+            active=active,
+            closed=closed,
+            limit=limit,
+            order=sort,
+            ascending=ascending,
+            start_date_min=newer_than,
+            start_date_max=older_than,
+        )
     if fmt == "json":
         click.echo(json.dumps([m.model_dump() for m in results], indent=2))
     else:
         for m in results:
             tokens = ", ".join(m.clob_token_ids[:1])
-            click.echo(f"{m.id:<12} {m.question[:60]:<60} [{tokens[:20]}]")
+            created = m.created_at[:10] if m.created_at else "N/A"
+            click.echo(f"{m.id:<12} {m.question[:50]:<50} [{tokens[:15]}] {created}")
 
 
 @main.command()
@@ -39,6 +65,9 @@ def markets(active: bool | None, closed: bool | None, limit: int, fmt: str) -> N
 @click.option("--start", required=True, help="Start date (YYYY-MM-DD or unix ts)")
 @click.option("--end", required=True, help="End date (YYYY-MM-DD or unix ts)")
 @click.option("--interval", default="1m", show_default=True, help="Bar interval (1m/5m/1h/6h/1d)")
+@click.option(
+    "--fidelity", default=1, show_default=True, help="Data accuracy in minutes (1=1min, 5=5min)"
+)
 @click.option("--output", "-o", default="-", help="Output file path (- for stdout)")
 @click.option("--format", "fmt", type=click.Choice(["csv", "json", "parquet"]), default="csv")
 @click.option("--no-cache", is_flag=True, help="Skip local cache")
@@ -47,6 +76,7 @@ def ohlcv(
     start: str,
     end: str,
     interval: str,
+    fidelity: int,
     output: str,
     fmt: str,
     no_cache: bool,
@@ -60,6 +90,7 @@ def ohlcv(
             end=end_ts,
             interval=interval,
             use_cache=not no_cache,
+            fidelity=fidelity,
         )
     _write_df(df, output, fmt)
 
