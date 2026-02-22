@@ -37,15 +37,38 @@ class PolymarketData:
         active: bool | None = None,
         closed: bool | None = None,
         limit: int = 100,
+        order: str | None = None,
+        ascending: bool | None = None,
+        start_date_min: str | None = None,
+        start_date_max: str | None = None,
     ) -> list[Market]:
-        return self._gamma.get_markets(active=active, closed=closed, limit=limit)
+        return self._gamma.get_markets(
+            active=active,
+            closed=closed,
+            limit=limit,
+            order=order,
+            ascending=ascending,
+            start_date_min=start_date_min,
+            start_date_max=start_date_max,
+        )
 
     def get_all_markets(
         self,
         active: bool | None = None,
         closed: bool | None = None,
+        order: str | None = None,
+        ascending: bool | None = None,
+        start_date_min: str | None = None,
+        start_date_max: str | None = None,
     ) -> list[Market]:
-        return self._gamma.iter_all_markets(active=active, closed=closed)
+        return self._gamma.iter_all_markets(
+            active=active,
+            closed=closed,
+            order=order,
+            ascending=ascending,
+            start_date_min=start_date_min,
+            start_date_max=start_date_max,
+        )
 
     def get_market(self, market_id: str) -> Market:
         cached = self._meta_cache.load_market(market_id)
@@ -76,11 +99,13 @@ class PolymarketData:
         end: datetime | int,
         interval: str = "1m",
         use_cache: bool = True,
+        fidelity: int = 1,
     ) -> pd.DataFrame:
         start_ts = _to_ts(start)
         end_ts = _to_ts(end)
 
-        if use_cache and self._price_cache.has_bars(token_id):
+        # Skip cache when fidelity != 1 to avoid serving wrong data
+        if use_cache and fidelity == 1 and self._price_cache.has_bars(token_id):
             df = self._price_cache.load_bars(token_id)
             if df is not None and not df.empty:
                 idx = df.index
@@ -93,11 +118,12 @@ class PolymarketData:
             token_id=token_id,
             start_ts=start_ts,
             end_ts=end_ts,
-            fidelity=1,
+            fidelity=fidelity,
         )
         bars = compute_ohlcv(points, interval=interval)
         df = to_dataframe(bars)
-        if use_cache:
+        # Only cache when fidelity == 1 to avoid coherency issues
+        if use_cache and fidelity == 1:
             self._price_cache.save_bars(token_id, df)
             self._meta_cache.save_fetch_info(token_id, start_ts, end_ts)
         return df
