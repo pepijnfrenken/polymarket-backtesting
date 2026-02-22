@@ -65,6 +65,8 @@ class Market(BaseModel):
     resolved: bool
     resolved_outcome: str | None = None
     end_date_iso: str | None = None
+    created_at: str | None = None
+    start_date: str | None = None
 
     @field_validator("clob_token_ids", "outcomes", mode="before")
     @classmethod

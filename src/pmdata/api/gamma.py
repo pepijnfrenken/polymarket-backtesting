@@ -47,6 +47,8 @@ class GammaClient:
             resolved=bool(raw.get("resolved", False)),
             resolved_outcome=raw.get("resolvedOutcome"),
             end_date_iso=raw.get("endDate"),
+            created_at=raw.get("createdAt"),
+            start_date=raw.get("startDate"),
         )
 
     @retry(
@@ -60,6 +62,10 @@ class GammaClient:
         closed: bool | None = None,
         limit: int = 100,
         offset: int = 0,
+        order: str | None = None,
+        ascending: bool | None = None,
+        start_date_min: str | None = None,
+        start_date_max: str | None = None,
     ) -> list[Market]:
         self._throttle()
         params: dict[str, Any] = {"limit": limit, "offset": offset}
@@ -67,6 +73,14 @@ class GammaClient:
             params["active"] = str(active).lower()
         if closed is not None:
             params["closed"] = str(closed).lower()
+        if order is not None:
+            params["order"] = order
+        if ascending is not None:
+            params["ascending"] = str(ascending).lower()
+        if start_date_min is not None:
+            params["start_date_min"] = start_date_min
+        if start_date_max is not None:
+            params["start_date_max"] = start_date_max
         resp = self._client.get("/markets", params=params)
         resp.raise_for_status()
         return [self._build_market(m) for m in resp.json()]
@@ -87,11 +101,24 @@ class GammaClient:
         active: bool | None = None,
         closed: bool | None = None,
         page_size: int = 100,
+        order: str | None = None,
+        ascending: bool | None = None,
+        start_date_min: str | None = None,
+        start_date_max: str | None = None,
     ) -> list[Market]:
         all_markets: list[Market] = []
         offset = 0
         while True:
-            page = self.get_markets(active=active, closed=closed, limit=page_size, offset=offset)
+            page = self.get_markets(
+                active=active,
+                closed=closed,
+                limit=page_size,
+                offset=offset,
+                order=order,
+                ascending=ascending,
+                start_date_min=start_date_min,
+                start_date_max=start_date_max,
+            )
             all_markets.extend(page)
             if len(page) < page_size:
                 break
